@@ -66,11 +66,45 @@ type Document struct {
 	Id    int
 }
 
+type PostingList map[int][]string
+
+type InvertedIndex map[string][]int
+
+func makeNgram(word string, n int) []string {
+	words := make([]string, 0, len(word)/2)
+	runes := []rune(word)
+	for i := 0; i < len(runes); i += n {
+		words = append(words, string(runes[i:i+n]))
+	}
+	return words
+}
+
+func makePostingList(documents []Document) PostingList {
+	postingList := make(PostingList)
+	for _, document := range documents {
+		postingList[document.Id] = makeNgram(document.Title+document.Text, 2)
+	}
+	return postingList
+}
+
+func makeInvertedIndex(postingList PostingList) InvertedIndex {
+	invertedIndex := make(InvertedIndex)
+	for id, words := range postingList {
+		for _, word := range words {
+			invertedIndex[word] = append(invertedIndex[word], id)
+		}
+	}
+	return invertedIndex
+}
+
 func saveIndex(fileName string) {
 	mediaWiki := loadXml(fileName)
 	documents := convertDocument(mediaWiki)
 
-	b, err := json.Marshal(documents)
+	postingList := makePostingList(documents)
+	invertedIndex := makeInvertedIndex(postingList)
+
+	b, err := json.Marshal(invertedIndex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,7 +113,7 @@ func saveIndex(fileName string) {
 	file.Write(b)
 }
 
-func readIndex(fileName string) []Document {
+func readIndex(fileName string) InvertedIndex {
 	file, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal(err)
@@ -91,9 +125,9 @@ func readIndex(fileName string) []Document {
 		log.Fatal("error: %v", err)
 	}
 
-	var documents []Document
-	json.Unmarshal(data, &documents)
-	return documents
+	invertedIndex := make(InvertedIndex, 0)
+	json.Unmarshal(data, &invertedIndex)
+	return invertedIndex
 }
 
 func main() {
@@ -104,9 +138,7 @@ func main() {
 	fileName := os.Args[1]
 
 	saveIndex(fileName)
-	documents := readIndex("/tmp/index.json")
+	invertedIndex := readIndex("/tmp/index.json")
+	fmt.Println(invertedIndex)
 
-	for i, document := range documents {
-		fmt.Println(i, document)
-	}
 }
