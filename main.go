@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/ikawaha/kagome/tokenizer"
 )
 
 const indexFilePath = "/tmp/index.json"
@@ -81,10 +83,23 @@ func makeNgram(word string, n int) []string {
 	return words
 }
 
+func Tokenize(word string) []string {
+	words := make([]string, 0)
+	t := tokenizer.New()
+	tokens := t.Tokenize(word)
+	for _, token := range tokens {
+		if token.Class == tokenizer.DUMMY {
+			continue
+		}
+		words = append(words, token.Surface)
+	}
+	return words
+}
+
 func makePostingList(documents []Document) PostingList {
 	postingList := make(PostingList)
 	for _, document := range documents {
-		postingList[document.Id] = makeNgram(document.Title+document.Text, 2)
+		postingList[document.Id] = Tokenize(document.Title + document.Text)
 	}
 	return postingList
 }
@@ -142,7 +157,7 @@ func contain(vec []int, value int) bool {
 }
 
 func search(invertedIndex InvertedIndex, query string) []int {
-	words := makeNgram(query, 2)
+	words := Tokenize(query)
 	result := make([]int, 0)
 	for _, word := range words {
 		if ids, ok := invertedIndex[word]; ok {
