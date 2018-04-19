@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+const indexFilePath = "/tmp/index.json"
+
 func showUsage() {
 	fmt.Println("Usage: kensaku [xmlfile]")
 }
@@ -108,7 +110,7 @@ func saveIndex(fileName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	file, err := os.Create(`/tmp/index.json`)
+	file, err := os.Create(indexFilePath)
 	defer file.Close()
 	file.Write(b)
 }
@@ -130,6 +132,30 @@ func readIndex(fileName string) InvertedIndex {
 	return invertedIndex
 }
 
+func contain(vec []int, value int) bool {
+	for _, v := range vec {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+func search(invertedIndex InvertedIndex, query string) []int {
+	words := makeNgram(query, 2)
+	result := make([]int, 0)
+	for _, word := range words {
+		if ids, ok := invertedIndex[word]; ok {
+			for _, id := range ids {
+				if !contain(result, id) {
+					result = append(result, id)
+				}
+			}
+		}
+	}
+	return result
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		showUsage()
@@ -138,7 +164,12 @@ func main() {
 	fileName := os.Args[1]
 
 	saveIndex(fileName)
-	invertedIndex := readIndex("/tmp/index.json")
-	fmt.Println(invertedIndex)
-
+	invertedIndex := readIndex(indexFilePath)
+	for {
+		var query string
+		fmt.Printf("query: ")
+		fmt.Scanf("%s", &query)
+		documentId := search(invertedIndex, query)
+		fmt.Println(documentId)
+	}
 }
