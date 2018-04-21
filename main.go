@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -205,31 +206,35 @@ func search(invertedIndex InvertedIndex, query string) []int {
 	return result
 }
 
-func printDocument(dictionary Dictionary, documentIds []int) {
-	for _, id := range documentIds {
-		document := dictionary[id]
-		fmt.Printf("Id: %d\n", document.Id)
-		fmt.Printf("Title: %s\n", document.Title)
-		fmt.Printf("Text: %s\n", document.Text)
+func convertDocumentsToJson(documents []Document) string {
+	b, err := json.Marshal(documents)
+	if err != nil {
+		log.Fatal(err)
 	}
+	return string(b)
+}
+
+func printDocument(dictionary Dictionary, documentIds []int) {
+	documents := make([]Document, 0)
+	for _, id := range documentIds {
+		documents = append(documents, dictionary[id])
+	}
+	output := convertDocumentsToJson(documents)
+	fmt.Println(output)
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		showUsage()
+	filename := flag.String("f", "", "feed data (xml)")
+	query := flag.String("q", "", "query")
+	flag.Parse()
+
+	if *filename != "" {
+		feedDocument(*filename)
 		return
 	}
-	fileName := os.Args[1]
 
-	feedDocument(fileName)
 	invertedIndex := readIndex(indexFilePath)
 	dictionary := readDictionary(dictionaryFilePath)
-
-	for {
-		var query string
-		fmt.Printf("query: ")
-		fmt.Scanf("%s", &query)
-		documentIds := search(invertedIndex, query)
-		printDocument(dictionary, documentIds)
-	}
+	documentIds := search(invertedIndex, *query)
+	printDocument(dictionary, documentIds)
 }
