@@ -12,6 +12,7 @@ import (
 )
 
 const indexFilePath = "/tmp/index.json"
+const dictionaryFilePath = "/tmp/dictionary.json"
 
 func showUsage() {
 	fmt.Println("Usage: kensaku [xmlfile]")
@@ -70,18 +71,11 @@ type Document struct {
 	Id    int
 }
 
+type Dictionary map[int]Document
+
 type PostingList map[int][]string
 
 type InvertedIndex map[string][]int
-
-func makeNgram(word string, n int) []string {
-	words := make([]string, 0, len(word)/2)
-	runes := []rune(word)
-	for i := 0; i < len(runes); i += n {
-		words = append(words, string(runes[i:i+n]))
-	}
-	return words
-}
 
 func Tokenize(word string) []string {
 	words := make([]string, 0)
@@ -94,6 +88,14 @@ func Tokenize(word string) []string {
 		words = append(words, token.Surface)
 	}
 	return words
+}
+
+func makeDictionary(documents []Document) Dictionary {
+	dictionary := make(Dictionary)
+	for _, document := range documents {
+		dictionary[document.Id] = document
+	}
+	return dictionary
 }
 
 func makePostingList(documents []Document) PostingList {
@@ -114,18 +116,33 @@ func makeInvertedIndex(postingList PostingList) InvertedIndex {
 	return invertedIndex
 }
 
-func saveIndex(fileName string) {
+func feedDocument(fileName string) {
 	mediaWiki := loadXml(fileName)
 	documents := convertDocument(mediaWiki)
 
 	postingList := makePostingList(documents)
+	dictionary := makeDictionary(documents)
 	invertedIndex := makeInvertedIndex(postingList)
+	saveIndex(invertedIndex)
+	saveDictionary(dictionary)
+}
 
+func saveIndex(invertedIndex InvertedIndex) {
 	b, err := json.Marshal(invertedIndex)
 	if err != nil {
 		log.Fatal(err)
 	}
 	file, err := os.Create(indexFilePath)
+	defer file.Close()
+	file.Write(b)
+}
+
+func saveDictionary(dictionary Dictionary) {
+	b, err := json.Marshal(dictionary)
+	if err != nil {
+		log.Fatal(err)
+	}
+	file, err := os.Create(dictionaryFilePath)
 	defer file.Close()
 	file.Write(b)
 }
@@ -145,6 +162,23 @@ func readIndex(fileName string) InvertedIndex {
 	invertedIndex := make(InvertedIndex, 0)
 	json.Unmarshal(data, &invertedIndex)
 	return invertedIndex
+}
+
+func readDictionary(fileName string) Dictionary {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal("error: %v", err)
+	}
+
+	dictionary := make(Dictionary, 0)
+	json.Unmarshal(data, &dictionary)
+	return dictionary
 }
 
 func contain(vec []int, value int) bool {
@@ -171,6 +205,15 @@ func search(invertedIndex InvertedIndex, query string) []int {
 	return result
 }
 
+func printDocument(dictionary Dictionary, documentIds []int) {
+	for _, id := range documentIds {
+		document := dictionary[id]
+		fmt.Printf("Id: %d\n", document.Id)
+		fmt.Printf("Title: %s\n", document.Title)
+		fmt.Printf("Text: %s\n", document.Text)
+	}
+}
+
 func main() {
 	if len(os.Args) != 2 {
 		showUsage()
@@ -178,13 +221,15 @@ func main() {
 	}
 	fileName := os.Args[1]
 
-	saveIndex(fileName)
+	feedDocument(fileName)
 	invertedIndex := readIndex(indexFilePath)
+	dictionary := readDictionary(dictionaryFilePath)
+
 	for {
 		var query string
 		fmt.Printf("query: ")
 		fmt.Scanf("%s", &query)
-		documentId := search(invertedIndex, query)
-		fmt.Println(documentId)
+		documentIds := search(invertedIndex, query)
+		printDocument(dictionary, documentIds)
 	}
 }
