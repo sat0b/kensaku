@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/ikawaha/kagome/tokenizer"
@@ -206,26 +207,50 @@ func search(invertedIndex InvertedIndex, query string) []int {
 	return result
 }
 
-func convertDocumentsToJson(documents []Document) string {
-	b, err := json.Marshal(documents)
+func convertResponseToJson(response Response) string {
+	b, err := json.Marshal(response)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return string(b)
 }
 
-func printDocument(dictionary Dictionary, documentIds []int) {
+type Response struct {
+	Hit       int
+	Query     string
+	Documents []Document
+}
+
+func getJsonOutput(query string, dictionary Dictionary, documentIds []int) string {
 	documents := make([]Document, 0)
 	for _, id := range documentIds {
 		documents = append(documents, dictionary[id])
 	}
-	output := convertDocumentsToJson(documents)
-	fmt.Println(output)
+	response := Response{Hit: len(documentIds), Query: query, Documents: documents}
+	output := convertResponseToJson(response)
+	return output
+}
+
+func serve() {
+	invertedIndex := readIndex(indexFilePath)
+	dictionary := readDictionary(dictionaryFilePath)
+	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := r.ParseForm(); err != nil {
+			log.Print(err)
+		}
+		if query, ok := r.Form["query"]; ok {
+			documentIds := search(invertedIndex, query[0])
+			output := getJsonOutput(query[0], dictionary, documentIds)
+			fmt.Fprintf(w, output)
+		}
+	})
+	http.ListenAndServe(":8000", nil)
 }
 
 func main() {
 	filename := flag.String("f", "", "feed data (xml)")
-	query := flag.String("q", "", "query")
+	serverMode := flag.Bool("s", true, "server mode")
 	flag.Parse()
 
 	if *filename != "" {
@@ -233,8 +258,7 @@ func main() {
 		return
 	}
 
-	invertedIndex := readIndex(indexFilePath)
-	dictionary := readDictionary(dictionaryFilePath)
-	documentIds := search(invertedIndex, *query)
-	printDocument(dictionary, documentIds)
+	if *serverMode {
+		serve()
+	}
 }
