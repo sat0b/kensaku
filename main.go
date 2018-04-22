@@ -9,12 +9,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/ikawaha/kagome/tokenizer"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
-const indexFilePath = "/tmp/index.json"
-const dictionaryFilePath = "/tmp/dictionary.json"
+const indexFilePath = "/tmp/index.db"
+const dictionaryFilePath = "/tmp/dictionary.db"
 
 func showUsage() {
 	fmt.Println("Usage: kensaku [xmlfile]")
@@ -127,13 +130,23 @@ func feedDocument(fileName string) {
 }
 
 func saveIndex(invertedIndex InvertedIndex) {
-	b, err := json.Marshal(invertedIndex)
+	db, err := leveldb.OpenFile(indexFilePath, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	file, err := os.Create(indexFilePath)
-	defer file.Close()
-	file.Write(b)
+	defer db.Close()
+	for k, v := range invertedIndex {
+		strv := make([]string, 0)
+		for _, id := range v {
+			strid := strconv.Itoa(id)
+			strv = append(strv, strid)
+		}
+		strids := strings.Join(strv, ",")
+		err = db.Put([]byte(k), []byte(strids), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 }
 
 func saveDictionary(dictionary Dictionary) {
@@ -146,25 +159,60 @@ func saveDictionary(dictionary Dictionary) {
 	file.Write(b)
 }
 
-func readIndex(fileName string) InvertedIndex {
-	file, err := os.Open(fileName)
+type Searcher struct {
+	db *leveldb.DB
+}
+
+func NewSearcher(filename string) *Searcher {
+	searcher := new(Searcher)
+	db, err := leveldb.OpenFile(filename, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatal("error: %v", err)
-	}
-
-	invertedIndex := make(InvertedIndex, 0)
-	json.Unmarshal(data, &invertedIndex)
-	return invertedIndex
+	searcher.db = db
+	return searcher
 }
 
-func readDictionary(fileName string) Dictionary {
-	file, err := os.Open(fileName)
+func (searcher *Searcher) Close() {
+	searcher.db.Close()
+}
+
+func (searcher *Searcher) Search(query string) []int {
+	result := make([]int, 0)
+	resultCount := map[int]int{}
+	words := Tokenize(query)
+	for _, word := range words {
+		ids := searcher.getResult(word)
+		for _, id := range ids {
+			if resultCount[id] == 0 {
+				result = append(result, id)
+				resultCount[id]++
+			}
+		}
+	}
+	return result
+}
+
+func (searcher *Searcher) getResult(query string) []int {
+	result := make([]int, 0)
+	data, err := searcher.db.Get([]byte(query), nil)
+	if err == leveldb.ErrNotFound {
+		return result
+	} else if err != nil {
+		log.Fatal(err)
+	}
+	for _, strid := range strings.Split(string(data), ",") {
+		id, err := strconv.Atoi(strid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result = append(result, id)
+	}
+	return result
+}
+
+func readDictionary(filename string) Dictionary {
+	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -187,21 +235,6 @@ func contain(vec []int, value int) bool {
 		}
 	}
 	return false
-}
-
-func search(invertedIndex InvertedIndex, query string) []int {
-	words := Tokenize(query)
-	result := make([]int, 0)
-	for _, word := range words {
-		if ids, ok := invertedIndex[word]; ok {
-			for _, id := range ids {
-				if !contain(result, id) {
-					result = append(result, id)
-				}
-			}
-		}
-	}
-	return result
 }
 
 func convertResponseToJson(response Response) string {
@@ -229,16 +262,17 @@ func getJsonOutput(query string, dictionary Dictionary, documentIds []int) strin
 }
 
 func serve() {
-	invertedIndex := readIndex(indexFilePath)
 	dictionary := readDictionary(dictionaryFilePath)
+	searcher := NewSearcher(indexFilePath)
 	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := r.ParseForm(); err != nil {
 			log.Print(err)
 		}
 		if query, ok := r.Form["query"]; ok {
-			documentIds := search(invertedIndex, query[0])
-			output := getJsonOutput(query[0], dictionary, documentIds)
+			q := query[0]
+			documentIds := searcher.Search(q)
+			output := getJsonOutput(q, dictionary, documentIds)
 			fmt.Fprintf(w, output)
 		}
 	})
