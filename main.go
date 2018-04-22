@@ -264,6 +264,7 @@ func getJsonOutput(query string, dictionary Dictionary, documentIds []int) strin
 func serve() {
 	dictionary := readDictionary(dictionaryFilePath)
 	searcher := NewSearcher(indexFilePath)
+	defer searcher.Close()
 	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if err := r.ParseForm(); err != nil {
