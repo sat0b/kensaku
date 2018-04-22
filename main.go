@@ -56,12 +56,9 @@ func loadXml(fileName string) *MediaWiki {
 }
 
 func convertDocument(mediaWiki *MediaWiki) []Document {
-	var documents []Document
+	documents := make([]Document, 0)
 	for i, page := range mediaWiki.Page {
-		var document Document
-		document.Title = page.Title
-		document.Text = page.Revision.Text
-		document.Id = i
+		document := Document{Title: page.Title, Text: page.Revision.Text, Id: i}
 		documents = append(documents, document)
 	}
 	return documents
