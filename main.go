@@ -40,13 +40,13 @@ type Revision struct {
 func loadXml(fileName string) *MediaWiki {
 	file, err := os.Open(fileName)
 	if err != nil {
-		log.Fatal("error: %v", err)
+		log.Fatal(err)
 	}
 	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatal("error: %v", err)
+		log.Fatal(err)
 	}
 
 	mediaWiki := new(MediaWiki)
@@ -159,58 +159,6 @@ func saveDictionary(dictionary Dictionary) {
 	file.Write(b)
 }
 
-type Searcher struct {
-	db *leveldb.DB
-}
-
-func NewSearcher(filename string) *Searcher {
-	searcher := new(Searcher)
-	db, err := leveldb.OpenFile(filename, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	searcher.db = db
-	return searcher
-}
-
-func (searcher *Searcher) Close() {
-	searcher.db.Close()
-}
-
-func (searcher *Searcher) Search(query string) []int {
-	result := make([]int, 0)
-	resultCount := map[int]int{}
-	words := Tokenize(query)
-	for _, word := range words {
-		ids := searcher.getResult(word)
-		for _, id := range ids {
-			if resultCount[id] == 0 {
-				result = append(result, id)
-				resultCount[id]++
-			}
-		}
-	}
-	return result
-}
-
-func (searcher *Searcher) getResult(query string) []int {
-	result := make([]int, 0)
-	data, err := searcher.db.Get([]byte(query), nil)
-	if err == leveldb.ErrNotFound {
-		return result
-	} else if err != nil {
-		log.Fatal(err)
-	}
-	for _, strid := range strings.Split(string(data), ",") {
-		id, err := strconv.Atoi(strid)
-		if err != nil {
-			log.Fatal(err)
-		}
-		result = append(result, id)
-	}
-	return result
-}
-
 func readDictionary(filename string) Dictionary {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -220,7 +168,7 @@ func readDictionary(filename string) Dictionary {
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatal("error: %v", err)
+		log.Fatal(err)
 	}
 
 	dictionary := make(Dictionary, 0)
