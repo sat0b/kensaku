@@ -29,33 +29,40 @@ func (s *Searcher) Close() {
 func (s *Searcher) Search(query string) []int {
 	result := make([]int, 0)
 	resultCount := map[int]int{}
-	words := Tokenize(query)
-	for _, word := range words {
-		ids := s.getResult(word)
-		for _, id := range ids {
-			if resultCount[id] == 0 {
-				result = append(result, id)
-				resultCount[id]++
+	offsetDocs := Tokenize(query)
+	for _, offsetDoc := range offsetDocs {
+		offsetIndexies := s.getResult(offsetDoc.Text)
+		for _, offsetIndex := range offsetIndexies {
+			if resultCount[offsetIndex.Id] == 0 {
+				result = append(result, offsetIndex.Id)
+				resultCount[offsetIndex.Id]++
 			}
 		}
 	}
 	return result
 }
 
-func (s *Searcher) getResult(query string) []int {
-	result := make([]int, 0)
+func (s *Searcher) getResult(query string) []OffsetIndex {
+	result := make([]OffsetIndex, 0)
 	data, err := s.db.Get([]byte(query), nil)
 	if err == leveldb.ErrNotFound {
 		return result
 	} else if err != nil {
 		log.Fatal(err)
 	}
-	for _, strid := range strings.Split(string(data), ",") {
-		id, err := strconv.Atoi(strid)
+	for _, str := range strings.Split(string(data), ",") {
+		splitted := strings.Split(str, ":")
+		strId := splitted[0]
+		strOffset := splitted[1]
+		id, err := strconv.Atoi(strId)
 		if err != nil {
 			log.Fatal(err)
 		}
-		result = append(result, id)
+		offset, err := strconv.Atoi(strOffset)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result = append(result, OffsetIndex{Id: id, Offset: offset})
 	}
 	return result
 }

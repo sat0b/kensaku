@@ -75,19 +75,29 @@ type Document struct {
 
 type Dictionary map[int]Document
 
-type PostingList map[int][]string
+type OffsetIndex struct {
+	Id     int
+	Offset int
+}
 
-type InvertedIndex map[string][]int
+type InvertedIndex map[string][]OffsetIndex
 
-func Tokenize(word string) []string {
-	words := make([]string, 0)
+type OffsetDoc struct {
+	Text   string
+	Offset int
+}
+
+type PostingList map[int][]OffsetDoc
+
+func Tokenize(word string) []OffsetDoc {
+	words := make([]OffsetDoc, 0)
 	t := tokenizer.New()
 	tokens := t.Tokenize(word)
-	for _, token := range tokens {
+	for i, token := range tokens {
 		if token.Class == tokenizer.DUMMY {
 			continue
 		}
-		words = append(words, token.Surface)
+		words = append(words, OffsetDoc{Text: token.Surface, Offset: i})
 	}
 	return words
 }
@@ -110,9 +120,11 @@ func makePostingList(documents []Document) PostingList {
 
 func makeInvertedIndex(postingList PostingList) InvertedIndex {
 	invertedIndex := make(InvertedIndex)
-	for id, words := range postingList {
-		for _, word := range words {
-			invertedIndex[word] = append(invertedIndex[word], id)
+	for id, offDocs := range postingList {
+		for _, offDoc := range offDocs {
+			word := offDoc.Text
+			offset := offDoc.Offset
+			invertedIndex[word] = append(invertedIndex[word], OffsetIndex{Id: id, Offset: offset})
 		}
 	}
 	return invertedIndex
@@ -121,7 +133,6 @@ func makeInvertedIndex(postingList PostingList) InvertedIndex {
 func feedDocument(fileName string) {
 	mediaWiki := loadXml(fileName)
 	documents := convertDocument(mediaWiki)
-
 	postingList := makePostingList(documents)
 	dictionary := makeDictionary(documents)
 	invertedIndex := makeInvertedIndex(postingList)
@@ -135,11 +146,12 @@ func saveIndex(invertedIndex InvertedIndex) {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	for k, v := range invertedIndex {
+	for k, offsetIndexies := range invertedIndex {
 		strv := make([]string, 0)
-		for _, id := range v {
-			strid := strconv.Itoa(id)
-			strv = append(strv, strid)
+		for _, offsetIndex := range offsetIndexies {
+			strId := strconv.Itoa(offsetIndex.Id)
+			strOffset := strconv.Itoa(offsetIndex.Offset)
+			strv = append(strv, strId+":"+strOffset)
 		}
 		strids := strings.Join(strv, ",")
 		err = db.Put([]byte(k), []byte(strids), nil)
