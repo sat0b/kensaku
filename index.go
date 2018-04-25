@@ -75,12 +75,12 @@ type Document struct {
 
 type Dictionary map[int]Document
 
-type OffsetIndex struct {
+type OffsetId struct {
 	Id     int
 	Offset int
 }
 
-type InvertedIndex map[string][]OffsetIndex
+type InvertedIndex map[string][]OffsetId
 
 type OffsetDoc struct {
 	Text   string
@@ -124,7 +124,7 @@ func makeInvertedIndex(postingList PostingList) InvertedIndex {
 		for _, offDoc := range offDocs {
 			word := offDoc.Text
 			offset := offDoc.Offset
-			invertedIndex[word] = append(invertedIndex[word], OffsetIndex{Id: id, Offset: offset})
+			invertedIndex[word] = append(invertedIndex[word], OffsetId{Id: id, Offset: offset})
 		}
 	}
 	return invertedIndex
@@ -136,11 +136,11 @@ func saveIndex(invertedIndex InvertedIndex) {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	for k, offsetIndexies := range invertedIndex {
+	for k, OffsetIds := range invertedIndex {
 		strv := make([]string, 0)
-		for _, offsetIndex := range offsetIndexies {
-			strId := strconv.Itoa(offsetIndex.Id)
-			strOffset := strconv.Itoa(offsetIndex.Offset)
+		for _, OffsetId := range OffsetIds {
+			strId := strconv.Itoa(OffsetId.Id)
+			strOffset := strconv.Itoa(OffsetId.Offset)
 			strv = append(strv, strId+":"+strOffset)
 		}
 		strids := strings.Join(strv, ",")

@@ -31,19 +31,19 @@ func (s *Searcher) Search(query string) []int {
 	resultCount := map[int]int{}
 	offsetDocs := Tokenize(query)
 	for _, offsetDoc := range offsetDocs {
-		offsetIndexies := s.getResult(offsetDoc.Text)
-		for _, offsetIndex := range offsetIndexies {
-			if resultCount[offsetIndex.Id] == 0 {
-				result = append(result, offsetIndex.Id)
-				resultCount[offsetIndex.Id]++
+		OffsetIds := s.getResult(offsetDoc.Text)
+		for _, OffsetId := range OffsetIds {
+			if resultCount[OffsetId.Id] == 0 {
+				result = append(result, OffsetId.Id)
+				resultCount[OffsetId.Id]++
 			}
 		}
 	}
 	return result
 }
 
-func (s *Searcher) getResult(query string) []OffsetIndex {
-	result := make([]OffsetIndex, 0)
+func (s *Searcher) getResult(query string) []OffsetId {
+	result := make([]OffsetId, 0)
 	data, err := s.db.Get([]byte(query), nil)
 	if err == leveldb.ErrNotFound {
 		return result
@@ -62,7 +62,7 @@ func (s *Searcher) getResult(query string) []OffsetIndex {
 		if err != nil {
 			log.Fatal(err)
 		}
-		result = append(result, OffsetIndex{Id: id, Offset: offset})
+		result = append(result, OffsetId{Id: id, Offset: offset})
 	}
 	return result
 }
