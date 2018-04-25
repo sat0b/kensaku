@@ -27,7 +27,7 @@ type Revision struct {
 	Text string `xml:"text"`
 }
 
-func FeedXml(fileName string) {
+func generateIndex(fileName string) {
 	mediaWiki := loadXml(fileName)
 	documents := convertDocument(mediaWiki)
 	postingList := makePostingList(documents)

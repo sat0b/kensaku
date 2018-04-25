@@ -57,7 +57,7 @@ func main() {
 	flag.Parse()
 
 	if *filename != "" {
-		FeedXml(*filename)
+		generateIndex(*filename)
 		return
 	}
 
