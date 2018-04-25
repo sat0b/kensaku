@@ -8,10 +8,6 @@ import (
 	"net/http"
 )
 
-func showUsage() {
-	fmt.Println("Usage: kensaku [xmlfile]")
-}
-
 type Response struct {
 	Hit       int
 	Query     string
