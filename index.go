@@ -117,11 +117,11 @@ func saveIndex(invertedIndex InvertedIndex) {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	for k, OffsetIds := range invertedIndex {
+	for k, offsetIds := range invertedIndex {
 		strv := make([]string, 0)
-		for _, OffsetId := range OffsetIds {
-			strId := strconv.Itoa(OffsetId.Id)
-			strOffset := strconv.Itoa(OffsetId.Offset)
+		for _, offsetId := range offsetIds {
+			strId := strconv.Itoa(offsetId.Id)
+			strOffset := strconv.Itoa(offsetId.Offset)
 			strv = append(strv, strId+":"+strOffset)
 		}
 		strids := strings.Join(strv, ",")
