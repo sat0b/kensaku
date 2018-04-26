@@ -28,7 +28,7 @@ func (s *Searcher) Close() {
 
 func (s *Searcher) Search(query string) []int {
 	result := make([]int, 0)
-	resultCount := map[int]int{}
+	resultCount := make(map[int]int)
 	offsetDocs := Tokenize(query)
 	for _, offsetDoc := range offsetDocs {
 		OffsetIds := s.getResult(offsetDoc.Text)
