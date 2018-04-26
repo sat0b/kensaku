@@ -51,17 +51,28 @@ func serve() {
 	http.ListenAndServe(":8000", nil)
 }
 
+func command(q string) {
+	dictionary := readDictionary(dictionaryFilePath)
+	searcher := NewSearcher(indexFilePath)
+	defer searcher.Close()
+	documentIds := searcher.Search(q)
+	output := getJsonOutput(q, dictionary, documentIds)
+	fmt.Println(output)
+}
+
 func main() {
 	filename := flag.String("f", "", "feed data (xml)")
-	serverMode := flag.Bool("s", true, "server mode")
+	serverMode := flag.Bool("s", false, "server mode")
+	query := flag.String("q", "", "query")
 	flag.Parse()
 
 	if *filename != "" {
 		generateIndex(*filename)
 		return
 	}
-
 	if *serverMode {
 		serve()
+	} else {
+		command(*query)
 	}
 }
