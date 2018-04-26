@@ -31,11 +31,11 @@ func (s *Searcher) Search(query string) []int {
 	resultCount := make(map[int]int)
 	offsetDocs := Tokenize(query)
 	for _, offsetDoc := range offsetDocs {
-		OffsetIds := s.getResult(offsetDoc.Text)
-		for _, OffsetId := range OffsetIds {
-			if resultCount[OffsetId.Id] == 0 {
-				result = append(result, OffsetId.Id)
-				resultCount[OffsetId.Id]++
+		offsetIds := s.getResult(offsetDoc.Text)
+		for _, offsetId := range offsetIds {
+			if resultCount[offsetId.Id] == 0 {
+				result = append(result, offsetId.Id)
+				resultCount[offsetId.Id]++
 			}
 		}
 	}
