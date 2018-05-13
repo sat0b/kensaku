@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -27,39 +28,51 @@ type Revision struct {
 }
 
 func generateIndex(fileName string) {
-	mediaWiki := loadXml(fileName)
-	documents := convertDocument(mediaWiki)
-	postingList := makePostingList(documents)
-	dictionary := makeDictionary(documents)
-	invertedIndex := makeInvertedIndex(postingList)
-	saveIndex(invertedIndex)
-	saveDictionary(dictionary)
-}
-
-func loadXml(fileName string) *MediaWiki {
 	file, err := os.Open(fileName)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	mediaWiki := new(MediaWiki)
-	err = xml.Unmarshal(data, mediaWiki)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return mediaWiki
+	decoder := xml.NewDecoder(file)
+	pageSave(decoder)
 }
 
-func convertDocument(mediaWiki *MediaWiki) []Document {
+func pageSave(decoder *xml.Decoder) {
+	const maxPageSize = 100
+	pages := make([]Page, 0)
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+
+		switch se := token.(type) {
+		case xml.StartElement:
+			if se.Name.Local == "page" {
+				var page Page
+				decoder.DecodeElement(&page, &se)
+				pages = append(pages, page)
+			}
+		}
+
+		if len(pages) > maxPageSize {
+			documents := convertDocument(pages)
+			postingList := makePostingList(documents)
+			dictionary := makeDictionary(documents)
+			invertedIndex := makeInvertedIndex(postingList)
+			saveIndex(invertedIndex)
+			saveDictionary(dictionary)
+			pages = make([]Page, 0)
+		}
+	}
+}
+
+func convertDocument(pages []Page) []Document {
 	documents := make([]Document, 0)
-	for i, page := range mediaWiki.Page {
+	for i, page := range pages {
 		document := Document{Title: page.Title, Text: page.Revision.Text, Id: i}
 		documents = append(documents, document)
 	}
